@@ -1,48 +1,46 @@
-export default function DealCard({ deal }) {
+export default function DealCard({
+  title,
+  price,
+  image,
+  link
+}) {
   return (
-    <div
-      style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: 16,
-        width: 320
-      }}
-    >
-      <img
-        src={deal.image}
-        alt={deal.title}
-        onError={(e) => {
-          e.target.src = "https://via.placeholder.com/300x200?text=No+Image";
-        }}
-        style={{
-          width: "100%",
-          height: 180,
-          objectFit: "contain",
-          marginBottom: 10
-        }}
-      />
+    <div className="deal-card">
+      {/* Image */}
+      {image ? (
+        <img
+          src={image}
+          alt={title || "Deal image"}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <div
+          style={{
+            height: "200px",
+            background: "#f3f4f6",
+            borderRadius: "8px",
+            marginBottom: "12px"
+          }}
+        />
+      )}
 
-      <h3>{deal.title}</h3>
-      <p style={{ fontWeight: "bold" }}>{deal.price}</p>
+      {/* Title */}
+      <h3>{title || "Untitled Deal"}</h3>
 
-      <a
-        href={deal.link}
-        target="_blank"
-        rel="noreferrer"
-        style={{
-          display: "block",
-          marginTop: 10,
-          textAlign: "center",
-          background: "#2563eb",
-          color: "white",
-          padding: "10px 0",
-          borderRadius: 8,
-          textDecoration: "none",
-          fontWeight: "bold"
-        }}
-      >
-        Buy Now
-      </a>
+      {/* Price */}
+      <div className="price">{price || ""}</div>
+
+      {/* Buy button */}
+      {link && (
+        <a
+          href={link}
+          target="_blank"
+          rel="nofollow noopener noreferrer"
+        >
+          Buy Now
+        </a>
+      )}
     </div>
   );
 }

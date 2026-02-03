@@ -1,37 +1,44 @@
-import { useState } from "react";
-import deals from "../data/deals.json";
+import Head from "next/head";
 import Header from "../components/Header";
-import CategoryMenu from "../components/CategoryMenu";
 import DealCard from "../components/DealCard";
+import deals from "../data/deals.json";
 
 export default function Home() {
-  const [activeCategory, setActiveCategory] = useState("All Deals");
-
-  const filteredDeals =
-    activeCategory === "All Deals"
-      ? deals
-      : deals.filter(deal => deal.category === activeCategory);
-
   return (
-    <div style={{ padding: 40 }}>
+    <>
+      <Head>
+        <title>PriceKeepr – Latest Deals</title>
+        <meta
+          name="description"
+          content="Latest Amazon deals and discounts. Updated regularly."
+        />
+      </Head>
+
       <Header />
 
-      <h1>🔥 Latest Deals</h1>
+      <main className="container">
+        <h1 className="page-title">Latest Deals</h1>
 
-      <CategoryMenu
-        active={activeCategory}
-        setActive={setActiveCategory}
-      />
-
-      {filteredDeals.length === 0 ? (
-        <p>No deals in this category.</p>
-      ) : (
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-          {filteredDeals.map(deal => (
-            <DealCard key={deal.id} deal={deal} />
-          ))}
+        <div className="deals-grid">
+          {deals && deals.length > 0 ? (
+            deals.map((deal) => (
+              <DealCard
+                key={deal.id}
+                title={deal.title}
+                price={deal.price}
+                image={deal.image}   // AMAZON IMAGE URL
+                link={deal.link}     // AMAZON PRODUCT URL
+              />
+            ))
+          ) : (
+            <p>No deals available.</p>
+          )}
         </div>
-      )}
-    </div>
+
+        <p className="affiliate-note">
+          As an Amazon Associate, we earn from qualifying purchases.
+        </p>
+      </main>
+    </>
   );
 }
