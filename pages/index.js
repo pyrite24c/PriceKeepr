@@ -1,44 +1,31 @@
-import Head from "next/head";
-import Header from "../components/Header";
+import fs from "fs";
+import path from "path";
 import DealCard from "../components/DealCard";
-import deals from "../data/deals.json";
 
-export default function Home() {
+export async function getStaticProps() {
+  const filePath = path.join(process.cwd(), "data", "deals.json");
+  const file = JSON.parse(fs.readFileSync(filePath, "utf8"));
+
+  return {
+    props: {
+      deals: file.deals
+    },
+    revalidate: 60
+  };
+}
+
+export default function Home({ deals }) {
   return (
-    <>
-      <Head>
-        <title>PriceKeepr – Latest Deals</title>
-        <meta
-          name="description"
-          content="Latest Amazon deals and discounts. Updated regularly."
-        />
-      </Head>
+    <main className="container">
+      <h1>Latest Deals</h1>
 
-      <Header />
+      {deals.length === 0 && <p>No deals yet.</p>}
 
-      <main className="container">
-        <h1 className="page-title">Latest Deals</h1>
-
-        <div className="deals-grid">
-          {deals && deals.length > 0 ? (
-            deals.map((deal) => (
-              <DealCard
-                key={deal.id}
-                title={deal.title}
-                price={deal.price}
-                image={deal.image}   // AMAZON IMAGE URL
-                link={deal.link}     // AMAZON PRODUCT URL
-              />
-            ))
-          ) : (
-            <p>No deals available.</p>
-          )}
-        </div>
-
-        <p className="affiliate-note">
-          As an Amazon Associate, we earn from qualifying purchases.
-        </p>
-      </main>
-    </>
+      <div className="grid">
+        {deals.map((deal, i) => (
+          <DealCard key={i} deal={deal} />
+        ))}
+      </div>
+    </main>
   );
 }
