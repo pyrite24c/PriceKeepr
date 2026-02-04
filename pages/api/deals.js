@@ -4,31 +4,31 @@ import path from "path";
 const filePath = path.join(process.cwd(), "data", "deals.json");
 
 export default function handler(req, res) {
-  // Ensure file exists
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, "[]", "utf8");
   }
 
-  const fileData = fs.readFileSync(filePath, "utf8");
   let deals = [];
-
   try {
-    deals = JSON.parse(fileData);
+    deals = JSON.parse(fs.readFileSync(filePath, "utf8"));
   } catch {
     deals = [];
   }
 
-  // READ deals
   if (req.method === "GET") {
     return res.status(200).json(deals);
   }
 
-  // WRITE deal (from Telegram bot)
   if (req.method === "POST") {
     const { title, price, image, link, category } = req.body;
 
-    // Hard validation (no garbage allowed)
-    if (!title || !price || !link || !link.includes("amazon")) {
+    // ✅ FIXED validation
+    if (
+      !title ||
+      !price ||
+      !link ||
+      !/amazon\.|amzn\.to/.test(link)
+    ) {
       return res.status(400).json({ error: "Invalid deal payload" });
     }
 
@@ -38,13 +38,11 @@ export default function handler(req, res) {
       price,
       image: image || "",
       link,
-      category: category || "General",
+      category: category || "Deals",
       createdAt: new Date().toISOString()
     };
 
     deals.unshift(newDeal);
-
-    // Keep only latest 100 deals
     deals = deals.slice(0, 100);
 
     fs.writeFileSync(filePath, JSON.stringify(deals, null, 2));
