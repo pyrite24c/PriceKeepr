@@ -1,11 +1,7 @@
 from telethon import TelegramClient, events
-import logging
+import requests
 import re
-import json
-import os
-from datetime import datetime
-
-# ---------------- CONFIG ----------------
+import logging
 
 API_ID = 25380512
 API_HASH = "ceaebc1277dcba1ca89b753e3f646e88"
@@ -23,81 +19,58 @@ SOURCE_CHANNELS = [
     -1001412868909,
     -1001388213936,
     -1001326994322,
-    -1002331799520   # your own channel ALSO as source
+    -1002331799520  # your own channel (allowed)
 ]
 
 DESTINATION_CHANNEL = -1002331799520
 
-DEALS_FILE = "data/deals.json"
+SITE_API = "https://pricekeepr.online/api/deals"
 
-# ---------------------------------------
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("userbot")
 
 client = TelegramClient("userbot_session", API_ID, API_HASH)
 
-# Ensure data folder
-os.makedirs("data", exist_ok=True)
-if not os.path.exists(DEALS_FILE):
-    with open(DEALS_FILE, "w") as f:
-        json.dump([], f)
-
-# ---------------- HELPERS ----------------
-
 def extract_price(text):
-    match = re.search(r"₹\s?\d[\d,]*", text)
+    match = re.search(r"₹\s?[\d,]+", text)
     return match.group(0) if match else None
 
 def extract_amazon_link(text):
-    match = re.search(r"(https?://(?:amzn\.to|www\.amazon\.in)[^\s]+)", text)
-    return match.group(1) if match else None
-
-def extract_title(text):
-    lines = text.strip().split("\n")
-    return lines[0][:120] if lines else None
-
-def save_deal(deal):
-    with open(DEALS_FILE, "r+", encoding="utf-8") as f:
-        data = json.load(f)
-        if deal["link"] in [d["link"] for d in data]:
-            return False
-        data.insert(0, deal)
-        f.seek(0)
-        json.dump(data[:200], f, indent=2)
-        f.truncate()
-    return True
-
-# ---------------- EVENTS ----------------
+    match = re.search(r"https?://(amzn\.to|www\.amazon\.in)\S+", text)
+    return match.group(0) if match else None
 
 @client.on(events.NewMessage(chats=SOURCE_CHANNELS))
 async def handler(event):
     text = event.raw_text or ""
-    
+
     price = extract_price(text)
     link = extract_amazon_link(text)
-    title = extract_title(text)
 
     if not price or not link:
         logger.info("Ignored: missing price or Amazon link")
         return
 
-    deal = {
+    title = text.split("\n")[0].strip()
+
+    payload = {
         "title": title,
         "price": price,
         "link": link,
-        "createdAt": datetime.utcnow().isoformat()
+        "image": "",  # Amazon preview image is enough
+        "category": "Deals"
     }
 
-    if save_deal(deal):
-        await client.send_message(
-            DESTINATION_CHANNEL,
-            f"{title}\n{price}\n{link}"
-        )
-        logger.info("Deal forwarded successfully")
+    try:
+        r = requests.post(SITE_API, json=payload, timeout=10)
+        if r.status_code == 200:
+            logger.info(f"Deal pushed to site: {title}")
+        else:
+            logger.error(f"Site rejected deal: {r.text}")
+    except Exception as e:
+        logger.error(f"POST failed: {e}")
 
-# ---------------- RUN ----------------
+    await event.forward_to(DESTINATION_CHANNEL)
 
-logger.info("Userbot running in TEST MODE")
 client.start()
+logger.info("Userbot running")
 client.run_until_disconnected()
