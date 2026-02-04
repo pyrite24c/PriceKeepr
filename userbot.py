@@ -1,24 +1,14 @@
 from telethon import TelegramClient, events
 import logging
 import re
+import json
+import os
+from datetime import datetime
 
-# -------------------- LOGGING --------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("userbot")
+# ---------------- CONFIG ----------------
 
-# -------------------- TELEGRAM CREDS --------------------
 API_ID = 25380512
 API_HASH = "ceaebc1277dcba1ca89b753e3f646e88"
-
-SESSION_NAME = "userbot_session"
-
-# -------------------- CHANNELS --------------------
-# ✅ ORIGINAL SOURCE CHANNELS (UNCHANGED)
-# ✅ PLUS your own channel added
-# ❌ NO random channels
 
 SOURCE_CHANNELS = [
     -1001687325075,
@@ -33,80 +23,81 @@ SOURCE_CHANNELS = [
     -1001412868909,
     -1001388213936,
     -1001326994322,
-
-    # ➕ your own channel
-    -1002331799520
+    -1002331799520   # your own channel ALSO as source
 ]
 
-# Destination = your private channel
 DESTINATION_CHANNEL = -1002331799520
 
-# -------------------- CLIENT --------------------
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+DEALS_FILE = "data/deals.json"
 
-# -------------------- REGEX --------------------
-PRICE_REGEX = re.compile(r"₹\s*([\d,]+)")
-AMAZON_REGEX = re.compile(
-    r"(https?://(?:amzn\.to|www\.amazon\.in|amazon\.in)[^\s]+)",
-    re.IGNORECASE
-)
+# ---------------------------------------
 
-# -------------------- PARSERS --------------------
-def extract_price(text: str):
-    match = PRICE_REGEX.search(text)
-    if not match:
-        return None
-    return int(match.group(1).replace(",", ""))
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("userbot")
 
-def extract_amazon_link(text: str):
-    match = AMAZON_REGEX.search(text)
-    if not match:
-        return None
-    return match.group(1)
+client = TelegramClient("userbot_session", API_ID, API_HASH)
 
-def extract_title(text: str):
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    return lines[0] if lines else None
+# Ensure data folder
+os.makedirs("data", exist_ok=True)
+if not os.path.exists(DEALS_FILE):
+    with open(DEALS_FILE, "w") as f:
+        json.dump([], f)
 
-# -------------------- EVENT HANDLER --------------------
+# ---------------- HELPERS ----------------
+
+def extract_price(text):
+    match = re.search(r"₹\s?\d[\d,]*", text)
+    return match.group(0) if match else None
+
+def extract_amazon_link(text):
+    match = re.search(r"(https?://(?:amzn\.to|www\.amazon\.in)[^\s]+)", text)
+    return match.group(1) if match else None
+
+def extract_title(text):
+    lines = text.strip().split("\n")
+    return lines[0][:120] if lines else None
+
+def save_deal(deal):
+    with open(DEALS_FILE, "r+", encoding="utf-8") as f:
+        data = json.load(f)
+        if deal["link"] in [d["link"] for d in data]:
+            return False
+        data.insert(0, deal)
+        f.seek(0)
+        json.dump(data[:200], f, indent=2)
+        f.truncate()
+    return True
+
+# ---------------- EVENTS ----------------
+
 @client.on(events.NewMessage(chats=SOURCE_CHANNELS))
-async def deal_listener(event):
+async def handler(event):
     text = event.raw_text or ""
-
-    title = extract_title(text)
+    
     price = extract_price(text)
     link = extract_amazon_link(text)
+    title = extract_title(text)
 
-    if not title or not price or not link:
+    if not price or not link:
         logger.info("Ignored: missing price or Amazon link")
         return
 
-    logger.info("Deal detected")
-    logger.info(f"Title: {title}")
-    logger.info(f"Price: ₹{price}")
-    logger.info(f"Link: {link}")
+    deal = {
+        "title": title,
+        "price": price,
+        "link": link,
+        "createdAt": datetime.utcnow().isoformat()
+    }
 
-    message = (
-        f"🔥 *Deal Alert*\n\n"
-        f"*{title}*\n"
-        f"💰 Price: ₹{price}\n"
-        f"🛒 {link}\n\n"
-        f"_As an Amazon Associate, we earn from qualifying purchases._"
-    )
+    if save_deal(deal):
+        await client.send_message(
+            DESTINATION_CHANNEL,
+            f"{title}\n{price}\n{link}"
+        )
+        logger.info("Deal forwarded successfully")
 
-    await client.send_message(
-        DESTINATION_CHANNEL,
-        message,
-        link_preview=True
-    )
+# ---------------- RUN ----------------
 
-    logger.info("Deal forwarded successfully")
-
-# -------------------- START --------------------
-def main():
-    logger.info("Userbot running in TEST MODE")
-    client.start()
-    client.run_until_disconnected()
-
-if __name__ == "__main__":
-    main()
+logger.info("Userbot running in TEST MODE")
+client.start()
+client.run_until_disconnected()

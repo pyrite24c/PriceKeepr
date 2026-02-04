@@ -1,31 +1,49 @@
-import fs from "fs";
-import path from "path";
-import DealCard from "../components/DealCard";
+import { useEffect, useState } from "react";
+import Footer from "../components/Footer";
 
-export async function getStaticProps() {
-  const filePath = path.join(process.cwd(), "data", "deals.json");
-  const file = JSON.parse(fs.readFileSync(filePath, "utf8"));
+export default function Home() {
+  const [deals, setDeals] = useState([]);
+  const [images, setImages] = useState({});
 
-  return {
-    props: {
-      deals: file.deals
-    },
-    revalidate: 60
-  };
-}
+  useEffect(() => {
+    async function load() {
+      const res = await fetch("/api/deals");
+      const data = await res.json();
+      setDeals(data);
 
-export default function Home({ deals }) {
+      data.forEach(async (deal) => {
+        const og = await fetch(
+          `/api/og?url=${encodeURIComponent(deal.link)}`
+        ).then(r => r.json());
+
+        setImages(prev => ({
+          ...prev,
+          [deal.link]: og.image
+        }));
+      });
+    }
+
+    load();
+  }, []);
+
   return (
     <main className="container">
       <h1>Latest Deals</h1>
 
-      {deals.length === 0 && <p>No deals yet.</p>}
-
-      <div className="grid">
-        {deals.map((deal, i) => (
-          <DealCard key={i} deal={deal} />
+      <div className="deals">
+        {deals.map((d, i) => (
+          <div className="deal-card" key={i}>
+            {images[d.link] && (
+              <img src={images[d.link]} className="deal-image" />
+            )}
+            <h2>{d.title}</h2>
+            <p className="price">{d.price}</p>
+            <a href={d.link} target="_blank">View on Amazon</a>
+          </div>
         ))}
       </div>
+
+      <Footer />
     </main>
   );
 }

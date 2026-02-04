@@ -1,7 +1,7 @@
 export default function Footer() {
   return (
-    <footer style={{ marginTop: "40px", fontSize: "14px", color: "#555" }}>
-      <p className="disclaimer">
+    <footer className="footer">
+      <p>
         As an Amazon Associate, we earn from qualifying purchases.
       </p>
     </footer>
