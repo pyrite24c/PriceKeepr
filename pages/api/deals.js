@@ -1,54 +1,46 @@
-import fs from "fs";
-import path from "path";
+// pages/api/deals.js
+import { Redis } from "@upstash/redis";
 
-const filePath = path.join(process.cwd(), "data", "deals.json");
+const redis = Redis.fromEnv();
 
-export default function handler(req, res) {
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, "[]", "utf8");
-  }
-
-  let deals = [];
+export default async function handler(req, res) {
   try {
-    deals = JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    deals = [];
-  }
+    if (req.method === "POST") {
+      const { title, price, link, image, category } = req.body;
 
-  if (req.method === "GET") {
-    return res.status(200).json(deals);
-  }
+      // Hard validation
+      if (!title || !price || !link) {
+        return res.status(400).json({ error: "Invalid deal payload" });
+      }
 
-  if (req.method === "POST") {
-    const { title, price, image, link, category } = req.body;
+      if (!link.includes("amazon.") && !link.includes("amzn.to")) {
+        return res.status(400).json({ error: "Invalid Amazon link" });
+      }
 
-    // ✅ FIXED validation
-    if (
-      !title ||
-      !price ||
-      !link ||
-      !/amazon\.|amzn\.to/.test(link)
-    ) {
-      return res.status(400).json({ error: "Invalid deal payload" });
+      const deal = {
+        id: Date.now(),
+        title,
+        price,
+        link,
+        image: image || null,
+        category: category || "General",
+        createdAt: new Date().toISOString()
+      };
+
+      // Push to Redis list
+      await redis.lpush("deals", deal);
+
+      return res.status(200).json({ success: true });
     }
 
-    const newDeal = {
-      id: Date.now(),
-      title,
-      price,
-      image: image || "",
-      link,
-      category: category || "Deals",
-      createdAt: new Date().toISOString()
-    };
+    if (req.method === "GET") {
+      const deals = await redis.lrange("deals", 0, 50);
+      return res.status(200).json(deals);
+    }
 
-    deals.unshift(newDeal);
-    deals = deals.slice(0, 100);
-
-    fs.writeFileSync(filePath, JSON.stringify(deals, null, 2));
-
-    return res.status(200).json({ success: true });
+    return res.status(405).json({ error: "Method not allowed" });
+  } catch (err) {
+    console.error("API error:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
-
-  return res.status(405).json({ error: "Method not allowed" });
 }

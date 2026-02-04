@@ -1,76 +1,70 @@
-from telethon import TelegramClient, events
-import requests
 import re
+import asyncio
 import logging
+import requests
+from telethon import TelegramClient, events
 
 API_ID = 25380512
-API_HASH = "ceaebc1277dcba1ca89b753e3f646e88"
+API_HASH = "YOUR_API_HASH"
 
 SOURCE_CHANNELS = [
     -1001687325075,
-    -1001192989118,
-    -1001266052687,
-    -1001332756990,
-    -1002393042058,
-    -1001707571730,
-    -1001391583159,
-    -1001407365889,
-    -1001396852404,
-    -1001412868909,
-    -1001388213936,
-    -1001326994322,
-    -1002331799520  # your own channel (allowed)
+    -1002331799520
 ]
 
-DESTINATION_CHANNEL = -1002331799520
+DESTINATION_CHANNELS = [
+    -1002331799520
+]
 
 SITE_API = "https://pricekeepr.online/api/deals"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("userbot")
 
-client = TelegramClient("userbot_session", API_ID, API_HASH)
+price_regex = re.compile(r"₹\s?[\d,]+")
+amazon_link_regex = re.compile(r"(https?://(?:www\.)?(?:amazon\.|amzn\.to)[^\s]+)")
 
-def extract_price(text):
-    match = re.search(r"₹\s?[\d,]+", text)
-    return match.group(0) if match else None
-
-def extract_amazon_link(text):
-    match = re.search(r"https?://(amzn\.to|www\.amazon\.in)\S+", text)
-    return match.group(0) if match else None
+client = TelegramClient("userbot", API_ID, API_HASH)
 
 @client.on(events.NewMessage(chats=SOURCE_CHANNELS))
 async def handler(event):
     text = event.raw_text or ""
 
-    price = extract_price(text)
-    link = extract_amazon_link(text)
+    price_match = price_regex.search(text)
+    link_match = amazon_link_regex.search(text)
 
-    if not price or not link:
+    if not price_match or not link_match:
         logger.info("Ignored: missing price or Amazon link")
         return
 
-    title = text.split("\n")[0].strip()
+    title = text.split("\n")[0][:120]
+    price = price_match.group()
+    link = link_match.group()
+
+    image = None
+    if event.message.media:
+        image = "https://via.placeholder.com/300"  # optional later upgrade
 
     payload = {
         "title": title,
         "price": price,
         "link": link,
-        "image": "",  # Amazon preview image is enough
+        "image": image,
         "category": "Deals"
     }
 
     try:
         r = requests.post(SITE_API, json=payload, timeout=10)
         if r.status_code == 200:
-            logger.info(f"Deal pushed to site: {title}")
+            logger.info("Deal pushed to site")
         else:
             logger.error(f"Site rejected deal: {r.text}")
     except Exception as e:
         logger.error(f"POST failed: {e}")
 
-    await event.forward_to(DESTINATION_CHANNEL)
+async def main():
+    await client.start()
+    logger.info("Userbot running")
+    await client.run_until_disconnected()
 
-client.start()
-logger.info("Userbot running")
-client.run_until_disconnected()
+asyncio.run(main())
