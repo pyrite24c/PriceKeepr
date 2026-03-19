@@ -1,19 +1,13 @@
 import { Redis } from "@upstash/redis";
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
+const redis = Redis.fromEnv();
 
 export default async function handler(req, res) {
   try {
-    const deals = await redis.lrange("deals", 0, 99);
-
-    return res.status(200).json({
-      success: true,
-      deals: deals.map(d => JSON.parse(d)),
-    });
+    const deals = await redis.lrange("deals", 0, 50);
+    return res.status(200).json(deals);
   } catch (err) {
+    console.error("GET DEALS ERROR:", err);
     return res.status(500).json({ error: "Failed to fetch deals" });
   }
 }
