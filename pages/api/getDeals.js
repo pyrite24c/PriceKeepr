@@ -14,7 +14,6 @@ export default async function handler(req, res) {
       deals: deals.map(d => JSON.parse(d)),
     });
   } catch (err) {
-    console.error(err);
     return res.status(500).json({ error: "Failed to fetch deals" });
   }
 }

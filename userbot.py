@@ -6,17 +6,17 @@ from telethon import TelegramClient, events
 
 API_ID = 25380512
 API_HASH = "ceaebc1277dcba1ca89b753e3f646e88"
-SOURCE_CHANNELS = SOURCE_CHANNELS = [
+
+SOURCE_CHANNELS = [
     -1001687325075, -1001192989118, -1001266052687,
     -1001332756990, -1002393042058, -1001707571730,
     -1001391583159, -1001407365889, -1001396852404,
-    -1001412868909, -1001388213936, -1001326994322, -1002331799520 ]
-
-DESTINATION_CHANNELS = [
+    -1001412868909, -1001388213936, -1001326994322,
     -1002331799520
 ]
 
-SITE_API = "https://pricekeepr.online/api/deals"
+SITE_API = "https://price-keepr.vercel.app/api/deals"
+SECRET = "pk_live_7Gk9Xv2QpL4mR8tWc6ZyB3HfN1sD5Ua"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("userbot")
@@ -34,37 +34,38 @@ async def handler(event):
     link_match = amazon_link_regex.search(text)
 
     if not price_match or not link_match:
-        logger.info("Ignored: missing price or Amazon link")
         return
 
     title = text.split("\n")[0][:120]
     price = price_match.group()
     link = link_match.group()
 
-    image = None
-    if event.message.media:
-        image = "https://via.placeholder.com/300"  # optional later upgrade
-
     payload = {
         "title": title,
         "price": price,
         "link": link,
-        "image": image,
-        "category": "Deals"
+        "image": None
+    }
+
+    headers = {
+        "Authorization": f"Bearer {SECRET}"
     }
 
     try:
-        r = requests.post(SITE_API, json=payload, timeout=10)
-        if r.status_code == 200:
-            logger.info("Deal pushed to site")
-        else:
-            logger.error(f"Site rejected deal: {r.text}")
+        r = requests.post(
+            SITE_API,
+            json=payload,
+            headers=headers,
+            timeout=10
+        )
+
+        print(r.status_code, r.text)
+
     except Exception as e:
-        logger.error(f"POST failed: {e}")
+        print(e)
 
 async def main():
     await client.start()
-    logger.info("Userbot running")
     await client.run_until_disconnected()
 
 asyncio.run(main())
