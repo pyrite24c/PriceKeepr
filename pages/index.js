@@ -1,49 +1,55 @@
 import { useEffect, useState } from "react";
-import Footer from "../components/Footer";
 
 export default function Home() {
   const [deals, setDeals] = useState([]);
-  const [images, setImages] = useState({});
 
   useEffect(() => {
-    async function load() {
-      const res = await fetch("/api/deals");
-      const data = await res.json();
-      setDeals(data);
-
-      data.forEach(async (deal) => {
-        const og = await fetch(
-          `/api/og?url=${encodeURIComponent(deal.link)}`
-        ).then(r => r.json());
-
-        setImages(prev => ({
-          ...prev,
-          [deal.link]: og.image
-        }));
-      });
-    }
-
-    load();
+    fetch("/api/getDeals")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setDeals(data);
+        } else {
+          console.error("Invalid data:", data);
+        }
+      })
+      .catch((err) => console.error("Fetch error:", err));
   }, []);
 
   return (
-    <main className="container">
-      <h1>Latest Deals</h1>
+    <div style={{ padding: 20 }}>
+      <h1>🔥 Latest Deals</h1>
 
-      <div className="deals">
-        {deals.map((d, i) => (
-          <div className="deal-card" key={i}>
-            {images[d.link] && (
-              <img src={images[d.link]} className="deal-image" />
-            )}
-            <h2>{d.title}</h2>
-            <p className="price">{d.price}</p>
-            <a href={d.link} target="_blank">View on Amazon</a>
+      {deals.length === 0 && <p>No deals yet</p>}
+
+      {Array.isArray(deals) &&
+        deals.map((deal) => (
+          <div
+            key={deal.id}
+            style={{
+              border: "1px solid #ccc",
+              padding: 15,
+              marginBottom: 15,
+              borderRadius: 10,
+            }}
+          >
+            <img
+              src={deal.image || "https://via.placeholder.com/300"}
+              alt={deal.title}
+              style={{ width: "100%", borderRadius: 10 }}
+            />
+
+            <h3>{deal.title || "No title"}</h3>
+
+            <p style={{ fontWeight: "bold" }}>
+              {deal.price || "Price not available"}
+            </p>
+
+            <a href={deal.link} target="_blank" rel="noopener noreferrer">
+              View Deal
+            </a>
           </div>
         ))}
-      </div>
-
-      <Footer />
-    </main>
+    </div>
   );
 }
