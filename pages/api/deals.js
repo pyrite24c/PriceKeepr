@@ -1,51 +1,50 @@
-// pages/api/deals.js
 import { Redis } from "@upstash/redis";
 
-const redis = Redis.fromEnv();
+// Use EXISTING Vercel KV env variables
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 export default async function handler(req, res) {
-  try {
-    if (req.method === "POST") {
-      const { title, price, link, category } = req.body;
-
-      // ✅ Proper validation
-      if (!title  !price  !link) {
-        return res.status(400).json({ error: "Invalid deal payload" });
-      }
-
-      if (!link.includes("amazon.") && !link.includes("amzn.to")) {
-        return res.status(400).json({ error: "Invalid Amazon link" });
-      }
-
-      const deal = {
-        id: Date.now(),
-        title,
-        price,
-        link,
-        image: null,
-        category: category || "General",
-        createdAt: new Date().toISOString()
-      };
-
-      // ✅ Store as string
-      await redis.lpush("deals", JSON.stringify(deal));
-
-      return res.status(200).json({ success: true });
-    }
-
-    if (req.method === "GET") {
-      const deals = await redis.lrange("deals", 0, 50);
-
-      // ✅ Parse back to objects
-      const parsedDeals = deals.map(d => JSON.parse(d));
-
-      return res.status(200).json(parsedDeals);
-    }
-
+  // Allow only POST
+  if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    const { title, price, link, image } = req.body;
+
+    // Validation (the thing that broke your entire life earlier)
+    if (!title || !price || !link) {
+      return res.status(400).json({ error: "Invalid deal payload" });
+    }
+
+    const deal = {
+      id: Date.now().toString(),
+      title,
+      price,
+      link,
+      image: image || "",
+      createdAt: new Date().toISOString(),
+    };
+
+    // Save deal
+    await redis.lpush("deals", JSON.stringify(deal));
+
+    // Keep only latest 100
+    await redis.ltrim("deals", 0, 99);
+
+    return res.status(200).json({
+      success: true,
+      deal,
+    });
 
   } catch (err) {
-    console.error("API error:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    console.error("API ERROR:", err);
+
+    return res.status(500).json({
+      error: "Internal server error",
+    });
   }
 }
